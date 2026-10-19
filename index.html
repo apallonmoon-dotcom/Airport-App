@@ -1,19 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Airport Advertising Hub</title>
+    <title>Инвентарь OOH - Аэропорт</title>
     <!-- Telegram Mini App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
-            /* Telegram Dynamic Theme Vars with Fallbacks */
+            /* Telegram Dynamic Theme Vars */
             --tg-bg-color: #ffffff;
             --tg-text-color: #1a1a1a;
             --tg-hint-color: #8e8e93;
             --tg-button-color: #007aff;
             --tg-button-text-color: #ffffff;
+            --tg-secondary-bg-color: #f0f0f0;
 
             /* Zones */
             --zone-a: #007bff;
@@ -40,7 +41,37 @@
             overflow: hidden;
         }
 
-        /* 1. Map Viewport Engine */
+        /* 1. Навигация (Quick Filter Bar) */
+        .filter-bar {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            display: flex;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.85);
+            padding: 8px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .filter-chip {
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: #e9ecef;
+            color: #495057;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .filter-chip.active { background: #212529; color: #fff; }
+
+        /* 2. Map Viewport Engine */
         #viewport {
             width: 100vw;
             height: 100vh;
@@ -56,25 +87,20 @@
             width: 2000px;
             height: 1125px;
             position: absolute;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
             transform-origin: 0 0;
             will-change: transform;
         }
 
         #map-img {
-            width: 100%;
-            height: 100%;
-            display: block;
-            pointer-events: none;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            width: 100%; height: 100%; display: block;
+            pointer-events: none; box-shadow: 0 10px 40px rgba(0,0,0,0.15);
         }
 
-        /* Interactive Pins */
+        /* Интерактивные точки (Pins) */
         .pin {
             position: absolute;
-            width: 24px;
-            height: 24px;
+            width: 24px; height: 24px;
             border-radius: 50%;
             background: #ffffff;
             box-shadow: 0 2px 8px rgba(0,0,0,0.35);
@@ -83,497 +109,245 @@
             transform: translate(-50%, -50%) scale(calc(1 / var(--map-scale)));
             transition: box-shadow 0.2s ease;
         }
-
-        .pin.active {
-            box-shadow: 0 0 0 calc(4px / var(--map-scale)) #ffffff, 0 0 20px rgba(0,0,0,0.6);
-            z-index: 20;
-        }
-
+        .pin.active { box-shadow: 0 0 0 calc(4px / var(--map-scale)) #ffffff, 0 0 20px rgba(0,0,0,0.6); z-index: 20; }
         .pin::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 100%;
-            height: 100%;
-            background: inherit;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            z-index: -1;
+            content: ''; position: absolute; top: 50%; left: 50%;
+            width: 100%; height: 100%; background: inherit; border-radius: 50%;
+            transform: translate(-50%, -50%); z-index: -1;
             animation: pulse-radar 2s infinite ease-out;
         }
-
         @keyframes pulse-radar {
             0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
             100% { transform: translate(-50%, -50%) scale(3.2); opacity: 0; }
         }
-
         .pin[data-zone="A"] { background-color: var(--zone-a); }
         .pin[data-zone="B"] { background-color: var(--zone-b); }
         .pin[data-zone="C"] { background-color: var(--zone-c); }
 
-        /* 2. Bottom Sheet */
+        /* 3. Шторка (Bottom Sheet) & Backdrop */
+        #sheet-backdrop {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4); z-index: 90; opacity: 0; transition: opacity 0.3s;
+        }
+
         #bottom-sheet {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
+            position: fixed; bottom: 0; left: 0; width: 100%;
             background: var(--tg-bg-color);
-            border-top-left-radius: 20px;
-            border-top-right-radius: 20px;
+            border-top-left-radius: 20px; border-top-right-radius: 20px;
             box-shadow: 0 -6px 30px rgba(0,0,0,0.2);
             padding: 20px 20px max(24px, env(safe-area-inset-bottom));
-            transform: translateY(115%);
+            transform: translateY(110%);
             transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
-            z-index: 100;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-            max-height: 80vh;
-            overflow-y: auto;
+            z-index: 100; display: flex; flex-direction: column; gap: 14px;
         }
-
-        #bottom-sheet.open {
-            transform: translateY(0);
-        }
-
-        .sheet-handle {
-            width: 36px;
-            height: 4px;
-            background: #d1d1d6;
-            border-radius: 2px;
-            margin: -8px auto 6px auto;
-        }
-
-        .sheet-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-
-        .unit-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 2px; }
+        #bottom-sheet.open { transform: translateY(0); }
+        
+        .sheet-handle { width: 36px; height: 4px; background: #d1d1d6; border-radius: 2px; margin: -8px auto 6px auto; }
+        .sheet-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .unit-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 2px; padding-right: 20px; }
         .unit-id { font-size: 0.8rem; color: var(--tg-hint-color); font-family: monospace; }
+        
+        .status-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: var(--tg-secondary-bg-color); margin-top: 6px;}
+        .status-badge.avail { color: #198754; }
+        .status-badge.booked { color: #fd7e14; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 
-        .zone-badge {
-            padding: 4px 8px;
-            border-radius: 8px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: #ffffff;
-            text-transform: uppercase;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            background: rgba(0,0,0,0.03);
-            padding: 12px;
-            border-radius: 12px;
+        .btn-close-sheet {
+            background: var(--tg-secondary-bg-color); border: none; width: 28px; height: 28px;
+            border-radius: 50%; color: var(--tg-hint-color); display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer;
         }
 
-        .stat-item span:first-child { 
-            display: block; 
-            font-size: 0.65rem; 
-            color: var(--tg-hint-color); 
-            text-transform: uppercase; 
-            margin-bottom: 2px; 
-        }
-        .stat-item span:last-child { 
-            display: block; 
-            font-size: 0.85rem; 
-            font-weight: 600; 
-        }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 12px; }
+        .stat-item span:first-child { display: block; font-size: 0.65rem; color: var(--tg-hint-color); text-transform: uppercase; margin-bottom: 2px; }
+        .stat-item span:last-child { display: block; font-size: 0.85rem; font-weight: 600; }
         .stat-item.full-width { grid-column: span 2; }
 
-        .btn-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-top: 4px;
-        }
-
         button.ui-btn {
-            border: none;
-            padding: 14px;
-            border-radius: 12px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.2s, transform 0.1s;
+            border: none; padding: 14px; border-radius: 12px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s, transform 0.1s; width: 100%;
         }
-
         button.ui-btn:active { transform: scale(0.98); }
+        .btn-mockup { background: #2c2c2e; color: #ffffff; margin-bottom: 8px;}
+        .btn-select { background: var(--tg-button-color); color: var(--tg-button-text-color); }
+        .btn-select.selected { background: #198754; }
 
-        .btn-mockup {
-            background: #2c2c2e;
-            color: #ffffff;
-        }
-
-        .btn-select {
-            background: var(--tg-button-color);
-            color: var(--tg-button-text-color);
-        }
-
-        .btn-select.selected {
-            background: #34c759;
-        }
-
-        /* 3. Mockup Overlay Engine */
+        /* 4. Mockup Engine */
         #mockup-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.92);
-            z-index: 1000;
-            flex-direction: column;
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10, 10, 12, 0.98); z-index: 1000; flex-direction: column;
         }
-
         .mockup-header {
-            width: 100%;
-            padding: 16px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(20, 20, 20, 0.8);
-            color: #ffffff;
-            z-index: 10;
+            width: 100%; padding: 16px; display: flex; justify-content: space-between; align-items: center;
+            background: rgba(30, 30, 30, 0.8); color: #ffffff; z-index: 10;
         }
-
-        .mockup-header label {
-            background: var(--tg-button-color);
-            color: var(--tg-button-text-color);
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
+        .mockup-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+        .mockup-controls label, .mockup-controls button {
+            background: var(--tg-button-color); color: #fff; padding: 8px 12px; border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
         }
-
-        .mockup-close {
-            background: rgba(255,255,255,0.2);
-            color: #ffffff;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .mockup-stage {
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 10px;
-            overflow: hidden;
-        }
-
-        #mockup-container {
-            position: relative;
-            display: inline-block;
-        }
-
-        #mockup-bg {
-            display: block;
-            max-width: 100vw;
-            max-height: 82vh;
-            pointer-events: none;
-        }
-
+        .mockup-controls button.btn-demo { background: #6f42c1; }
+        
+        .mockup-stage { flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 10px; overflow: hidden; }
+        #mockup-container { position: relative; display: inline-block; }
+        #mockup-bg { display: block; max-width: 100vw; max-height: 80vh; pointer-events: none; }
         #mockup-ad-wrapper {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100px;
-            height: 100px;
-            transform-origin: 0 0;
-            pointer-events: none;
-            overflow: hidden;
-            background: rgba(0, 122, 255, 0.25);
+            position: absolute; top: 0; left: 0; width: 100px; height: 100px; transform-origin: 0 0; pointer-events: none; overflow: hidden; background: rgba(255, 255, 255, 0.1);
         }
-
-        #mockup-ad-img {
-            width: 100%;
-            height: 100%;
-            display: none;
-            object-fit: fill;
-        }
-
+        #mockup-ad-img { width: 100%; height: 100%; display: none; object-fit: fill; }
         #mockup-lighting {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: linear-gradient(135deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.05) 45%, rgba(0,0,0,0.15) 60%, rgba(0,0,0,0.3) 100%);
-            mix-blend-mode: hard-light;
-            pointer-events: none;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.05) 45%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0.25) 100%);
+            mix-blend-mode: hard-light; pointer-events: none;
         }
+
+        /* 5. Экран успеха */
+        #success-screen {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--tg-bg-color); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
+        }
+        .success-icon { width: 80px; height: 80px; border-radius: 50%; background: #198754; color: #fff; font-size: 40px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
-    <!-- Main Viewport (Map Pan/Zoom) -->
+    <!-- Фильтры зон -->
+    <div class="filter-bar">
+        <button class="filter-chip active" onclick="App.focusZone('ALL')">Все зоны</button>
+        <button class="filter-chip" onclick="App.focusZone('A')">Регистрация (A)</button>
+        <button class="filter-chip" onclick="App.focusZone('B')">Duty Free (B)</button>
+        <button class="filter-chip" onclick="App.focusZone('C')">Выдача багажа (C)</button>
+    </div>
+
+    <!-- Интерактивная карта -->
     <div id="viewport">
         <div id="map-container">
-            <img id="map-img" src="Airport_terminal_architectural_s…_2K_20261019151423.jpg" alt="Terminal Map">
-            <!-- Pins dynamically injected -->
+            <img id="map-img" src="Airport_terminal_architectural_s…_2K_20261019151423.jpg" alt="Схема Терминала">
         </div>
     </div>
 
-    <!-- Bottom Sheet Details -->
+    <!-- Затемнение (Backdrop) -->
+    <div id="sheet-backdrop" onclick="App.closeSheet()"></div>
+
+    <!-- Шторка карточки объекта -->
     <div id="bottom-sheet">
         <div class="sheet-handle"></div>
         <div class="sheet-header">
             <div>
                 <div class="unit-title" id="bs-title">--</div>
                 <div class="unit-id" id="bs-id">--</div>
+                <div id="bs-status" class="status-badge avail">
+                    <div class="status-dot"></div> <span id="bs-status-text">Свободен к бронированию</span>
+                </div>
             </div>
-            <span class="zone-badge" id="bs-badge">ZONE</span>
+            <button class="btn-close-sheet" onclick="App.closeSheet()">✕</button>
         </div>
 
         <div class="stats-grid">
             <div class="stat-item full-width">
-                <span>Metrics (Daily Footfall / Dwell / Peak)</span>
+                <span>Медиаметрика (Суточный трафик / Время контакта / Пик)</span>
                 <span id="bs-metrics">--</span>
             </div>
             <div class="stat-item">
-                <span>Format Type</span>
+                <span>Формат и носитель</span>
                 <span id="bs-format">--</span>
             </div>
             <div class="stat-item">
-                <span>Aspect & Resolution</span>
+                <span>Разрешение экрана</span>
                 <span id="bs-res">--</span>
-            </div>
-            <div class="stat-item full-width">
-                <span>Recommended Creative Style</span>
-                <span id="bs-style" style="font-weight: normal; font-size: 0.75rem;">--</span>
             </div>
         </div>
 
-        <div class="btn-group">
+        <div>
             <button class="ui-btn btn-mockup" id="btn-trigger-mockup" onclick="App.launchMockup()">
-                Visual Mockup Projection
+                👁 Предпросмотр рекламы на точке
             </button>
             <button class="ui-btn btn-select" id="btn-toggle-select" onclick="App.toggleSelection()">
-                Add to Booking Inquiry
+                ＋ Добавить в заявку
             </button>
         </div>
     </div>
 
-    <!-- Mockup Perspective Canvas Overlay -->
+    <!-- Мокап-оверлей -->
     <div id="mockup-overlay">
         <div class="mockup-header">
-            <div>
-                <span id="mockup-title" style="font-size: 0.9rem; font-weight: bold; margin-right: 10px;">Mockup Engine</span>
-                <label for="ad-file-input">Upload Media</label>
+            <span id="mockup-title" style="font-size: 0.9rem; font-weight: bold;">--</span>
+            <div class="mockup-controls">
+                <button class="btn-demo" onclick="App.loadDemoCreative()">Тестовый креатив</button>
+                <label for="ad-file-input">Свой файл</label>
                 <input type="file" id="ad-file-input" accept="image/*" style="display: none;" onchange="App.handleUpload(event)">
+                <button onclick="App.closeMockup()" style="background: rgba(255,255,255,0.2);">Закрыть</button>
             </div>
-            <button class="mockup-close" onclick="App.closeMockup()">Close</button>
         </div>
         <div class="mockup-stage">
             <div id="mockup-container">
-                <img id="mockup-bg" alt="Location Plate">
+                <img id="mockup-bg" alt="Фото локации">
                 <div id="mockup-ad-wrapper">
-                    <img id="mockup-ad-img" alt="Uploaded Ad">
+                    <img id="mockup-ad-img" alt="Реклама">
                     <div id="mockup-lighting"></div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Экран успеха -->
+    <div id="success-screen">
+        <div class="success-icon">✓</div>
+        <h2 style="margin-bottom: 10px;">Заявка сформирована!</h2>
+        <p style="color: var(--tg-hint-color); margin-bottom: 20px;">Ваши креативы и выбранные точки переданы в коммерческий отдел аэропорта.</p>
+        <div id="success-details" style="text-align: left; background: var(--tg-secondary-bg-color); padding: 15px; border-radius: 10px; width: 100%; max-width: 300px; margin-bottom: 30px; font-size: 0.9rem;">
+            <!-- Список выбранного -->
+        </div>
+        <button class="ui-btn btn-select" onclick="tg.close()">Вернуться в Telegram</button>
+    </div>
+
     <script>
-        /**
-         * Consolidated Master Architecture
-         */
         const App = (function() {
-            // Master Inventory Dataset (Chat 1 + Chat 2 Geometry)
+            // Данные (Локализация + Статусы)
             const inventory = [
                 {
-                    id: "APT-T1-CHK-LB01",
-                    zone: "A",
-                    name: "Main Ticketing Concourse North Lightbox",
-                    format: "Static Lightbox",
-                    footfall: "68,500/day",
-                    dwell: "450s",
-                    peak: "05:00 - 09:00",
-                    res: "7680x2880 (16:9)",
-                    style: "High-contrast static branding, clean typography, large brand iconography",
+                    id: "APT-T1-CHK-LB01", zone: "A", name: "Лайтбокс у стоек регистрации",
+                    format: "Статичный лайтбокс", footfall: "68,500 чел/сутки", dwell: "7.5 мин", peak: "05:00 - 09:00", res: "7680x2880 (16:9)", status: "avail",
                     pin: { x: 26.8, y: 34.2 },
-                    surface: {
-                        image: "Blank_lightbox_in_airport_hall_2K_20261019151523.jpg",
-                        corners: {
-                            tl: { x: 55.03, y: 41.30 },
-                            tr: { x: 85.47, y: 22.15 },
-                            br: { x: 85.48, y: 71.34 },
-                            bl: { x: 54.97, y: 65.56 }
-                        }
-                    }
+                    surface: { image: "Blank_lightbox_in_airport_hall_2K_20261019151523.jpg", corners: { tl: { x: 55.03, y: 41.30 }, tr: { x: 85.47, y: 22.15 }, br: { x: 85.48, y: 71.34 }, bl: { x: 54.97, y: 65.56 } } }
                 },
                 {
-                    id: "APT-T1-CHK-DOOH02",
-                    zone: "A",
-                    name: "Priority Drop-off Central Totem",
-                    format: "DOOH Screen",
-                    footfall: "42,000/day",
-                    dwell: "280s",
-                    peak: "06:00 - 10:00",
-                    res: "2160x3840 (9:16)",
-                    style: "Dynamic 15-second loop, bold kinetic typography, luxury corporate",
-                    pin: { x: 19.4, y: 40.5 },
-                    surface: null
+                    id: "APT-T1-CHK-DOOH02", zone: "A", name: "Digital-тотем на входе",
+                    format: "DOOH Видеоэкран", footfall: "42,000 чел/сутки", dwell: "4.5 мин", peak: "06:00 - 10:00", res: "2160x3840 (9:16)", status: "booked",
+                    pin: { x: 19.4, y: 40.5 }, surface: null
                 },
                 {
-                    id: "APT-T1-AIR-DOOH03",
-                    zone: "B",
-                    name: "Luxury Plaza Overhead Spectacular",
-                    format: "DOOH Screen",
-                    footfall: "94,000/day",
-                    dwell: "1,250s",
-                    peak: "11:00 - 15:30",
-                    res: "3840x2160 (16:9)",
-                    style: "Ultra-HD cinematic video, 3D anamorphic depth illusions, luxury retail",
+                    id: "APT-T1-AIR-DOOH03", zone: "B", name: "Центральный медиафасад Duty Free",
+                    format: "DOOH Видеоэкран", footfall: "94,000 чел/сутки", dwell: "20.8 мин", peak: "11:00 - 15:30", res: "3840x2160 (16:9)", status: "avail",
                     pin: { x: 55.8, y: 38.2 },
-                    surface: {
-                        image: "Airport_shopping_galleria_digita…_2K_20261019151608.jpg",
-                        corners: {
-                            tl: { x: 34.78, y: 20.12 },
-                            tr: { x: 65.19, y: 20.07 },
-                            br: { x: 65.73, y: 50.52 },
-                            bl: { x: 34.24, y: 50.57 }
-                        }
-                    }
+                    surface: { image: "Airport_shopping_galleria_digita…_2K_20261019151608.jpg", corners: { tl: { x: 34.78, y: 20.12 }, tr: { x: 65.19, y: 20.07 }, br: { x: 65.73, y: 50.52 }, bl: { x: 34.24, y: 50.57 } } }
                 },
                 {
-                    id: "APT-T1-AIR-COL04",
-                    zone: "B",
-                    name: "Gate Concourse Promenade Column",
-                    format: "Digital Column Wrap",
-                    footfall: "58,000/day",
-                    dwell: "720s",
-                    peak: "13:00 - 19:00",
-                    res: "1536x3584 (Custom)",
-                    style: "Seamless portrait looping animation, vertical-first fashion creative",
-                    pin: { x: 70.8, y: 53.6 },
-                    surface: null
+                    id: "APT-T1-AIR-COL04", zone: "B", name: "Медиаколонна у выходов на посадку",
+                    format: "DOOH Колонна", footfall: "58,000 чел/сутки", dwell: "12 мин", peak: "13:00 - 19:00", res: "1536x3584 (Custom)", status: "avail",
+                    pin: { x: 70.8, y: 53.6 }, surface: null
                 },
                 {
-                    id: "APT-T1-ARR-DOOH05",
-                    zone: "C",
-                    name: "Baggage Claim Reclaim Totem",
-                    format: "DOOH Screen (Vertical Totem)",
-                    footfall: "47,000/day",
-                    dwell: "1,600s",
-                    peak: "16:00 - 21:30",
-                    res: "2160x3840 (9:16)",
-                    style: "Regional destination campaigns, telecom roaming, ride-hailing app promotions",
+                    id: "APT-T1-ARR-DOOH05", zone: "C", name: "Тотем в зоне выдачи багажа",
+                    format: "DOOH Вертикальный тотем", footfall: "47,000 чел/сутки", dwell: "26.6 мин", peak: "16:00 - 21:30", res: "2160x3840 (9:16)", status: "avail",
                     pin: { x: 38.6, y: 72.8 },
-                    surface: {
-                        image: "Airport_baggage_reclaim_hall_screen_2K_20261019151720.jpg",
-                        corners: {
-                            tl: { x: 42.62, y: 20.70 },
-                            tr: { x: 57.45, y: 20.70 },
-                            br: { x: 57.45, y: 66.86 },
-                            bl: { x: 42.62, y: 66.86 }
-                        }
-                    }
+                    surface: { image: "Airport_baggage_reclaim_hall_screen_2K_20261019151720.jpg", corners: { tl: { x: 42.62, y: 20.70 }, tr: { x: 57.45, y: 20.70 }, br: { x: 57.45, y: 66.86 }, bl: { x: 42.62, y: 66.86 } } }
                 },
                 {
-                    id: "APT-T1-ARR-LB06",
-                    zone: "C",
-                    name: "Customs Exit Welcome Lightbox",
-                    format: "Static Lightbox",
-                    footfall: "52,000/day",
-                    dwell: "210s",
-                    peak: "17:00 - 22:30",
-                    res: "3840x2160 (16:9)",
-                    style: "Punchy static lifestyle visuals, local hospitality branding",
-                    pin: { x: 50.4, y: 79.2 },
-                    surface: null
+                    id: "APT-T1-ARR-LB06", zone: "C", name: "Лайтбокс на выходе в город",
+                    format: "Статичный лайтбокс", footfall: "52,000 чел/сутки", dwell: "3.5 мин", peak: "17:00 - 22:30", res: "3840x2160 (16:9)", status: "booked",
+                    pin: { x: 50.4, y: 79.2 }, surface: null
                 }
             ];
 
             let activeUnit = null;
-            const selectedUnits = new Map(); // id => { hasMockup: boolean }
+            // Храним состояние заявки и загруженные мокапы
+            // format: id => { inCart: boolean, mockupData: string | null }
+            const stateDb = new Map(); 
 
-            // TMA SDK Instance Integration
-            const tg = window.Telegram?.WebApp;
+            window.tg = window.Telegram?.WebApp;
 
-            function initTMA() {
-                if (tg) {
-                    tg.ready();
-                    tg.expand();
-                    const theme = tg.themeParams || {};
-                    const root = document.documentElement;
-                    if (theme.bg_color) root.style.setProperty('--tg-bg-color', theme.bg_color);
-                    if (theme.text_color) root.style.setProperty('--tg-text-color', theme.text_color);
-                    if (theme.button_color) root.style.setProperty('--tg-button-color', theme.button_color);
-                    if (theme.button_text_color) root.style.setProperty('--tg-button-text-color', theme.button_text_color);
-
-                    tg.onEvent('mainButtonClicked', submitPayload);
-                    tg.onEvent('backButtonClicked', handleNativeBack);
-                }
-                syncMainButton();
-            }
-
-            function syncMainButton() {
-                if (!tg) return;
-                const count = selectedUnits.size;
-                if (count > 0) {
-                    tg.MainButton.text = `Request Proposal (${count} Surface${count > 1 ? 's' : ''})`;
-                    if (!tg.MainButton.isVisible) tg.MainButton.show();
-                } else {
-                    if (tg.MainButton.isVisible) tg.MainButton.hide();
-                }
-            }
-
-            function handleNativeBack() {
-                const mockupOverlay = document.getElementById('mockup-overlay');
-                const bottomSheet = document.getElementById('bottom-sheet');
-
-                if (mockupOverlay.style.display === 'flex') {
-                    closeMockup();
-                } else if (bottomSheet.classList.contains('open')) {
-                    closeSheet();
-                }
-            }
-
-            function syncBackButton(visible) {
-                if (!tg) return;
-                if (visible) tg.BackButton.show();
-                else tg.BackButton.hide();
-            }
-
-            function submitPayload() {
-                if (tg) tg.MainButton.showProgress();
-
-                const payload = {
-                    action: "booking_inquiry",
-                    timestamp: new Date().toISOString(),
-                    user_id: tg?.initDataUnsafe?.user?.id || null,
-                    username: tg?.initDataUnsafe?.user?.username || null,
-                    selected_inventory: Array.from(selectedUnits.entries()).map(([id, data]) => ({
-                        id: id,
-                        has_custom_mockup: data.hasMockup
-                    }))
-                };
-
-                setTimeout(() => {
-                    if (tg && tg.initData) {
-                        try {
-                            tg.sendData(JSON.stringify(payload));
-                        } catch (e) {
-                            alert(`Submitted Payload:\n\n${JSON.stringify(payload, null, 2)}`);
-                            tg.MainButton.hideProgress();
-                        }
-                    } else {
-                        alert(`[Browser Preview] Lead Generated:\n\n${JSON.stringify(payload, null, 2)}`);
-                    }
-                }, 400);
-            }
-
-            // Viewport Pan/Zoom Math
+            // -- MAP ENGINE --
             const vp = document.getElementById('viewport');
             const mapContainer = document.getElementById('map-container');
-            const vState = { scale: 1, x: 0, y: 0, isDragging: false, sx: 0, sy: 0, initialDist: null, initialScale: 1 };
+            const vState = { scale: 1, x: 0, y: 0, targetX: null, targetY: null, targetScale: null, animFrame: null };
             const MAP_W = 2000, MAP_H = 1125;
 
             function applyMapTransform() {
@@ -585,269 +359,267 @@
                 const rect = vp.getBoundingClientRect();
                 const curW = MAP_W * vState.scale;
                 const curH = MAP_H * vState.scale;
-
                 if (curW < rect.width) vState.x = (rect.width - curW) / 2;
                 else vState.x = Math.max(rect.width - curW, Math.min(0, vState.x));
-
                 if (curH < rect.height) vState.y = (rect.height - curH) / 2;
                 else vState.y = Math.max(rect.height - curH, Math.min(0, vState.y));
             }
 
-            function initMapEngine() {
-                // Initial Zoom & Center
+            function animatePanZoom(callback) {
+                if(vState.targetScale === null) return;
+                const dx = vState.targetX - vState.x;
+                const dy = vState.targetY - vState.y;
+                const ds = vState.targetScale - vState.scale;
+                
+                vState.x += dx * 0.1;
+                vState.y += dy * 0.1;
+                vState.scale += ds * 0.1;
+
+                if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(ds) < 0.01) {
+                    vState.x = vState.targetX; vState.y = vState.targetY; vState.scale = vState.targetScale;
+                    vState.targetScale = null;
+                    clampMap(); applyMapTransform();
+                    if(callback) callback();
+                    return;
+                }
+                clampMap(); applyMapTransform();
+                vState.animFrame = requestAnimationFrame(() => animatePanZoom(callback));
+            }
+
+            function focusZone(zoneCode) {
+                // Обновляем UI кнопок
+                document.querySelectorAll('.filter-chip').forEach(btn => {
+                    btn.classList.toggle('active', btn.innerText.includes(zoneCode === 'ALL' ? 'Все' : `(${zoneCode})`));
+                });
+
                 const rect = vp.getBoundingClientRect();
-                vState.scale = Math.max(rect.width / MAP_W, rect.height / MAP_H) * 1.1;
-                vState.scale = Math.max(0.4, Math.min(2.5, vState.scale));
-                vState.x = (rect.width - (MAP_W * vState.scale)) / 2;
-                vState.y = (rect.height - (MAP_H * vState.scale)) / 2;
-                clampMap();
-                applyMapTransform();
+                if (zoneCode === 'ALL') {
+                    vState.targetScale = Math.max(rect.width / MAP_W, rect.height / MAP_H) * 1.1;
+                    vState.targetX = (rect.width - (MAP_W * vState.targetScale)) / 2;
+                    vState.targetY = (rect.height - (MAP_H * vState.targetScale)) / 2;
+                } else {
+                    const pins = inventory.filter(u => u.zone === zoneCode);
+                    if(pins.length === 0) return;
+                    const avgX = pins.reduce((s, p) => s + p.pin.x, 0) / pins.length;
+                    const avgY = pins.reduce((s, p) => s + p.pin.y, 0) / pins.length;
+                    vState.targetScale = 1.8;
+                    vState.targetX = (rect.width / 2) - ((avgX / 100) * MAP_W * vState.targetScale);
+                    vState.targetY = (rect.height / 2) - ((avgY / 100) * MAP_H * vState.targetScale);
+                }
+                cancelAnimationFrame(vState.animFrame);
+                animatePanZoom();
+            }
 
-                // Mouse events
-                vp.addEventListener('mousedown', (e) => {
-                    if (e.target.closest('.pin')) return;
-                    vState.isDragging = true;
-                    vState.sx = e.clientX - vState.x;
-                    vState.sy = e.clientY - vState.y;
-                });
-                window.addEventListener('mousemove', (e) => {
-                    if (!vState.isDragging) return;
-                    vState.x = e.clientX - vState.sx;
-                    vState.y = e.clientY - vState.sy;
-                    clampMap();
-                    requestAnimationFrame(applyMapTransform);
-                });
-                window.addEventListener('mouseup', () => vState.isDragging = false);
-
-                // Wheel
-                vp.addEventListener('wheel', (e) => {
-                    e.preventDefault();
-                    const xs = (e.clientX - vState.x) / vState.scale;
-                    const ys = (e.clientY - vState.y) / vState.scale;
-                    vState.scale += -e.deltaY * 0.003;
-                    vState.scale = Math.max(0.4, Math.min(2.5, vState.scale));
-                    vState.x = e.clientX - xs * vState.scale;
-                    vState.y = e.clientY - ys * vState.scale;
-                    clampMap();
-                    requestAnimationFrame(applyMapTransform);
-                }, { passive: false });
-
-                // Touch (Pinch/Pan)
+            function initMapEvents() {
+                let isDragging = false, sx = 0, sy = 0, initialDist = null, initialScale = 1;
                 vp.addEventListener('touchstart', (e) => {
-                    if (e.target.closest('.pin')) return;
-                    if (e.touches.length === 1) {
-                        vState.isDragging = true;
-                        vState.sx = e.touches[0].clientX - vState.x;
-                        vState.sy = e.touches[0].clientY - vState.y;
-                    } else if (e.touches.length === 2) {
-                        vState.isDragging = false;
-                        vState.initialDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                        vState.initialScale = vState.scale;
-                    }
+                    if (e.target.closest('.pin') || e.target.closest('.filter-bar')) return;
+                    cancelAnimationFrame(vState.animFrame); vState.targetScale = null;
+                    if (e.touches.length === 1) { isDragging = true; sx = e.touches[0].clientX - vState.x; sy = e.touches[0].clientY - vState.y; }
+                    else if (e.touches.length === 2) { isDragging = false; initialDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); initialScale = vState.scale; }
                 });
-
                 vp.addEventListener('touchmove', (e) => {
-                    if (e.touches.length === 1 && vState.isDragging) {
-                        vState.x = e.touches[0].clientX - vState.sx;
-                        vState.y = e.touches[0].clientY - vState.sy;
-                        clampMap();
-                        requestAnimationFrame(applyMapTransform);
+                    if (e.touches.length === 1 && isDragging) {
+                        vState.x = e.touches[0].clientX - sx; vState.y = e.touches[0].clientY - sy;
+                        clampMap(); applyMapTransform();
                     } else if (e.touches.length === 2) {
                         e.preventDefault();
                         const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                        const ratio = dist / vState.initialDist;
-                        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                        const xs = (cx - vState.x) / vState.scale;
-                        const ys = (cy - vState.y) / vState.scale;
-
-                        vState.scale = Math.max(0.4, Math.min(2.5, vState.initialScale * ratio));
-                        vState.x = cx - xs * vState.scale;
-                        vState.y = cy - ys * vState.scale;
-                        clampMap();
-                        requestAnimationFrame(applyMapTransform);
+                        const ratio = dist / initialDist;
+                        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2; const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                        const xs = (cx - vState.x) / vState.scale; const ys = (cy - vState.y) / vState.scale;
+                        vState.scale = Math.max(0.4, Math.min(3, initialScale * ratio));
+                        vState.x = cx - xs * vState.scale; vState.y = cy - ys * vState.scale;
+                        clampMap(); applyMapTransform();
                     }
                 }, { passive: false });
-
-                vp.addEventListener('touchend', (e) => {
-                    if (e.touches.length === 0) vState.isDragging = false;
-                });
-
-                // Dismiss Sheet when tapping empty map
-                vp.addEventListener('click', (e) => {
-                    if (e.target.id === 'viewport' || e.target.id === 'map-img') closeSheet();
-                });
+                vp.addEventListener('touchend', (e) => { if (e.touches.length === 0) isDragging = false; });
             }
 
-            // Render Pins
-            function renderPins() {
+            // -- TMA & LOGIC --
+            function init() {
                 inventory.forEach(unit => {
                     const pin = document.createElement('div');
-                    pin.className = 'pin';
-                    pin.dataset.id = unit.id;
-                    pin.dataset.zone = unit.zone;
-                    pin.style.left = `${unit.pin.x}%`;
-                    pin.style.top = `${unit.pin.y}%`;
-
-                    pin.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        openSheet(unit);
-                    });
+                    pin.className = 'pin'; pin.dataset.id = unit.id; pin.dataset.zone = unit.zone;
+                    pin.style.left = `${unit.pin.x}%`; pin.style.top = `${unit.pin.y}%`;
+                    pin.addEventListener('click', (e) => { e.stopPropagation(); openSheet(unit); });
                     mapContainer.appendChild(pin);
                 });
+
+                if (tg) {
+                    tg.ready(); tg.expand();
+                    tg.onEvent('mainButtonClicked', submitPayload);
+                    tg.onEvent('backButtonClicked', () => {
+                        if (document.getElementById('mockup-overlay').style.display === 'flex') closeMockup();
+                        else closeSheet();
+                    });
+                }
+                focusZone('ALL');
+                initMapEvents();
             }
 
-            // Bottom Sheet Controller
-            const sheet = document.getElementById('bottom-sheet');
             function openSheet(unit) {
                 activeUnit = unit;
                 document.querySelectorAll('.pin').forEach(p => p.classList.toggle('active', p.dataset.id === unit.id));
+                document.getElementById('sheet-backdrop').style.display = 'block';
+                setTimeout(() => document.getElementById('sheet-backdrop').style.opacity = '1', 10);
 
                 document.getElementById('bs-title').innerText = unit.name;
-                document.getElementById('bs-id').innerText = unit.id;
+                document.getElementById('bs-id').innerText = `ID: ${unit.id}`;
                 
-                const badge = document.getElementById('bs-badge');
-                badge.innerText = `Zone ${unit.zone}`;
-                badge.style.backgroundColor = `var(--zone-${unit.zone.toLowerCase()})`;
+                const sb = document.getElementById('bs-status');
+                const sbt = document.getElementById('bs-status-text');
+                sb.className = `status-badge ${unit.status}`;
+                sbt.innerText = unit.status === 'avail' ? 'Доступно для брони' : 'В резерве до конца месяца';
 
-                document.getElementById('bs-metrics').innerText = `${unit.footfall} | Dwell: ${unit.dwell} | Peak: ${unit.peak}`;
+                document.getElementById('bs-metrics').innerText = `${unit.footfall} | ${unit.dwell} | Пик: ${unit.peak}`;
                 document.getElementById('bs-format').innerText = unit.format;
                 document.getElementById('bs-res').innerText = unit.res;
-                document.getElementById('bs-style').innerText = unit.style;
 
-                // Adjust Mockup button availability
-                const mockupBtn = document.getElementById('btn-trigger-mockup');
-                if (unit.surface) {
-                    mockupBtn.style.display = 'block';
-                } else {
-                    mockupBtn.style.display = 'none'; // No 3D projection plate available for this unit
-                }
+                document.getElementById('btn-trigger-mockup').style.display = unit.surface ? 'block' : 'none';
 
-                syncSelectBtnState();
-                sheet.classList.add('open');
-                syncBackButton(true);
+                syncSelectBtn();
+                document.getElementById('bottom-sheet').classList.add('open');
+                if (tg) tg.BackButton.show();
             }
 
             function closeSheet() {
-                sheet.classList.remove('open');
+                document.getElementById('bottom-sheet').classList.remove('open');
                 document.querySelectorAll('.pin').forEach(p => p.classList.remove('active'));
+                const bd = document.getElementById('sheet-backdrop');
+                bd.style.opacity = '0';
+                setTimeout(() => bd.style.display = 'none', 300);
                 activeUnit = null;
-                syncBackButton(false);
+                if (tg) tg.BackButton.hide();
             }
 
             function toggleSelection() {
                 if (!activeUnit) return;
-                if (selectedUnits.has(activeUnit.id)) {
-                    selectedUnits.delete(activeUnit.id);
-                } else {
-                    selectedUnits.set(activeUnit.id, { hasMockup: false });
-                }
-                syncSelectBtnState();
-                syncMainButton();
+                const data = stateDb.get(activeUnit.id) || { inCart: false, mockupData: null };
+                data.inCart = !data.inCart;
+                stateDb.set(activeUnit.id, data);
+                syncSelectBtn(); syncMainButton();
             }
 
-            function syncSelectBtnState() {
+            function syncSelectBtn() {
                 const btn = document.getElementById('btn-toggle-select');
-                if (activeUnit && selectedUnits.has(activeUnit.id)) {
-                    btn.classList.add('selected');
-                    btn.innerText = '✓ Selected in Proposal';
-                } else {
-                    btn.classList.remove('selected');
-                    btn.innerText = 'Add to Booking Inquiry';
+                const data = stateDb.get(activeUnit?.id);
+                if (data && data.inCart) { btn.classList.add('selected'); btn.innerText = '✓ Включено в заявку'; } 
+                else { btn.classList.remove('selected'); btn.innerText = '＋ Добавить в заявку'; }
+            }
+
+            function syncMainButton() {
+                let count = 0;
+                stateDb.forEach(v => { if (v.inCart) count++; });
+                if (count > 0 && tg) {
+                    tg.MainButton.text = `Отправить заявку (${count})`;
+                    if (!tg.MainButton.isVisible) tg.MainButton.show();
+                } else if (tg && tg.MainButton.isVisible) {
+                    tg.MainButton.hide();
                 }
             }
 
-            // Mockup Homography Engine
-            const mockupOverlay = document.getElementById('mockup-overlay');
-            const mockupBg = document.getElementById('mockup-bg');
+            // -- MOCKUP ENGINE --
             const adWrapper = document.getElementById('mockup-ad-wrapper');
             const adImg = document.getElementById('mockup-ad-img');
 
             function launchMockup() {
                 if (!activeUnit || !activeUnit.surface) return;
-                document.getElementById('mockup-title').innerText = activeUnit.id;
-                mockupBg.src = activeUnit.surface.image;
+                document.getElementById('mockup-title').innerText = activeUnit.name;
+                document.getElementById('mockup-bg').src = activeUnit.surface.image;
+                
+                // Восстановление загруженного мокапа для ЭТОЙ точки
+                const data = stateDb.get(activeUnit.id);
+                if (data && data.mockupData) {
+                    adImg.src = data.mockupData; adImg.style.display = 'block'; adWrapper.style.background = 'transparent';
+                } else {
+                    adImg.src = ''; adImg.style.display = 'none'; adWrapper.style.background = 'rgba(255, 255, 255, 0.1)';
+                }
 
-                mockupOverlay.style.display = 'flex';
-                syncBackButton(true);
-
-                if (mockupBg.complete) computeHomography();
-                else mockupBg.onload = computeHomography;
-
-                window.addEventListener('resize', computeHomography);
+                document.getElementById('mockup-overlay').style.display = 'flex';
+                setTimeout(computeHomography, 50); // Ждем рендеринга картинки
             }
 
             function closeMockup() {
-                mockupOverlay.style.display = 'none';
-                window.removeEventListener('resize', computeHomography);
-                if (activeUnit) syncBackButton(true); // Return to active sheet state
-                else syncBackButton(false);
+                document.getElementById('mockup-overlay').style.display = 'none';
             }
 
-            function handleUpload(event) {
-                const file = event.target.files[0];
-                if (!file) return;
+            function saveMockupState(dataUrl) {
+                adImg.src = dataUrl; adImg.style.display = 'block'; adWrapper.style.background = 'transparent';
+                if (!activeUnit) return;
+                const data = stateDb.get(activeUnit.id) || { inCart: false, mockupData: null };
+                data.mockupData = dataUrl;
+                stateDb.set(activeUnit.id, data);
+                computeHomography();
+            }
 
+            function loadDemoCreative() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 1920; canvas.height = 1080;
+                const ctx = canvas.getContext('2d');
+                
+                // Gradient BG
+                const grd = ctx.createLinearGradient(0,0,1920,1080);
+                grd.addColorStop(0, "#ff4b2b"); grd.addColorStop(1, "#ff416c");
+                ctx.fillStyle = grd; ctx.fillRect(0,0,1920,1080);
+                
+                // Text
+                ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+                ctx.font = 'bold 150px sans-serif'; ctx.fillText('ВАШ БРЕНД', 960, 500);
+                ctx.font = '70px sans-serif'; ctx.fillText('Увидят миллионы пассажиров', 960, 650);
+                
+                saveMockupState(canvas.toDataURL());
+            }
+
+            function handleUpload(e) {
+                const file = e.target.files[0]; if (!file) return;
                 const reader = new FileReader();
-                reader.onload = (e) => {
-                    adImg.src = e.target.result;
-                    adImg.style.display = 'block';
-                    adWrapper.style.background = 'transparent';
-
-                    // Track mockup creation state
-                    if (activeUnit && selectedUnits.has(activeUnit.id)) {
-                        selectedUnits.get(activeUnit.id).hasMockup = true;
-                    }
-                    computeHomography();
-                };
+                reader.onload = (ev) => saveMockupState(ev.target.result);
                 reader.readAsDataURL(file);
             }
 
             function computeHomography() {
                 if (!activeUnit || !activeUnit.surface) return;
-                const cw = mockupBg.clientWidth;
-                const ch = mockupBg.clientHeight;
-                if (cw === 0 || ch === 0) return;
+                const bg = document.getElementById('mockup-bg');
+                const cw = bg.clientWidth, ch = bg.clientHeight;
+                if (cw === 0) return;
 
                 const c = activeUnit.surface.corners;
-                const x0 = (c.tl.x / 100) * cw, y0 = (c.tl.y / 100) * ch;
-                const x1 = (c.tr.x / 100) * cw, y1 = (c.tr.y / 100) * ch;
-                const x2 = (c.br.x / 100) * cw, y2 = (c.br.y / 100) * ch;
-                const x3 = (c.bl.x / 100) * cw, y3 = (c.bl.y / 100) * ch;
+                const x0 = (c.tl.x/100)*cw, y0 = (c.tl.y/100)*ch;
+                const x1 = (c.tr.x/100)*cw, y1 = (c.tr.y/100)*ch;
+                const x2 = (c.br.x/100)*cw, y2 = (c.br.y/100)*ch;
+                const x3 = (c.bl.x/100)*cw, y3 = (c.bl.y/100)*ch;
 
-                const dx1 = x1 - x2, dx2 = x3 - x2, sx = x0 - x1 + x2 - x3;
-                const dy1 = y1 - y2, dy2 = y3 - y2, sy = y0 - y1 + y2 - y3;
+                const dx1=x1-x2, dx2=x3-x2, sx=x0-x1+x2-x3;
+                const dy1=y1-y2, dy2=y3-y2, sy=y0-y1+y2-y3;
+                const det = (dx1*dy2 - dy1*dx2) || 0.00001;
+                const g = (sx*dy2 - sy*dx2)/det, h = (dx1*sy - dy1*sx)/det;
+                const a = x1-x0+g*x1, b = x3-x0+h*x3, d = y1-y0+g*y1, e = y3-y0+h*y3;
 
-                const det = (dx1 * dy2 - dy1 * dx2) || 0.00001;
-                const g = (sx * dy2 - sy * dx2) / det;
-                const h = (dx1 * sy - dy1 * sx) / det;
-
-                const a = x1 - x0 + g * x1;
-                const b = x3 - x0 + h * x3;
-                const d = y1 - y0 + g * y1;
-                const e = y3 - y0 + h * y3;
-
-                const W = 100, H = 100;
-                adWrapper.style.transform = `matrix3d(
-                    ${a/W}, ${d/W}, 0, ${g/W},
-                    ${b/H}, ${e/H}, 0, ${h/H},
-                    0,      0,      1, 0,
-                    ${x0},  ${y0},  0, 1
-                )`;
+                adWrapper.style.transform = `matrix3d(${a/100},${d/100},0,${g/100},${b/100},${e/100},0,${h/100},0,0,1,0,${x0},${y0},0,1)`;
             }
 
-            return {
-                init: () => {
-                    initMapEngine();
-                    renderPins();
-                    initTMA();
-                },
-                launchMockup,
-                closeMockup,
-                closeSheet,
-                toggleSelection,
-                handleUpload
-            };
+            // -- SUBMISSION --
+            function submitPayload() {
+                if (tg) tg.MainButton.showProgress();
+                setTimeout(() => {
+                    if (tg) { tg.MainButton.hideProgress(); tg.MainButton.hide(); tg.BackButton.hide(); }
+                    closeSheet();
+                    
+                    const detailsBox = document.getElementById('success-details');
+                    detailsBox.innerHTML = '';
+                    stateDb.forEach((val, id) => {
+                        if (val.inCart) {
+                            const unit = inventory.find(u => u.id === id);
+                            detailsBox.innerHTML += `<div style="margin-bottom:8px;"><b>• ${unit.name}</b><br><span style="font-size:0.75rem; color:var(--tg-hint-color);">ID: ${id} | Мокап: ${val.mockupData ? 'Прикреплен' : 'Нет'}</span></div>`;
+                        }
+                    });
+
+                    document.getElementById('success-screen').style.display = 'flex';
+                }, 600);
+            }
+
+            return { init, focusZone, closeSheet, toggleSelection, launchMockup, closeMockup, loadDemoCreative, handleUpload };
         })();
 
         document.addEventListener('DOMContentLoaded', App.init);
